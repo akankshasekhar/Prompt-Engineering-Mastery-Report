@@ -98,3 +98,88 @@ Final Answer: Saturday
 
 **Analysis:**
 By explicitly prompting the model to think step by step, it generated a complete, verifiable audit trail. While it arrived at the same conclusion as the zero-shot prompt, the CoT approach eliminates the "black box" effect. In a production environment, this granular reasoning drastically reduces hallucinations on complex math and allows developers to trace and correct flawed logic.
+
+
+## Phase 3: Structured Output (JSON)
+
+### Task Description
+Extracting specific entities (name, date, amount) from unstructured, messy text and enforcing a strict, machine-readable JSON format for backend processing.
+
+### Structured JSON Prompt
+**Prompt:**
+> Extract the name, date, and amount from the following text.
+> 
+> You must format your response strictly as a valid JSON object matching this exact schema:
+> {
+>   "name": "string",
+>   "date": "string",
+>   "amount": float (must be a numerical value, do not include currency symbols or commas)
+> }
+> 
+> Return ONLY the raw JSON object. Do not include markdown formatting blocks (like ```json) and do not add any conversational text before or after.
+> 
+> Text: []
+
+**Raw Outputs (5 Test Cases):**
+
+**Input 1:** "Just wanted to let you know that John Doe sent over the payment for the Q3 invoice on October 12th. The total amount transferred was $4,500.50."
+{ 
+  "name": "John Doe", 
+  "date": "October 12th", 
+  "amount": 4500.50 
+}
+
+**Input 2:** "Hey! Alice Smith paid 200.00 for the consulting gig yesterday, Nov 1st. Thanks!"
+{ 
+  "name": "Alice Smith", 
+  "date": "Nov 1st", 
+  "amount": 200.00 
+}
+
+**Input 3:** "Invoice #9923 for $1,250.75 was cleared by Robert Johnson on 2023-08-15."
+{ 
+  "name": "Robert Johnson", 
+  "date": "2023-08-15", 
+  "amount": 1250.75 
+}
+
+**Input 4:** "payment received: 50.00. sender: emily chen. date cleared: Jan 5."
+{ 
+  "name": "emily chen", 
+  "date": "Jan 5", 
+  "amount": 50.00 
+}
+
+**Input 5:** "David Lee dropped off a check for three hundred dollars on March 10."
+{ 
+  "name": "David Lee", 
+  "date": "March 10", 
+  "amount": 300.00 
+}
+
+**Analysis:**
+The prompt achieved a 100% (5/5) success rate across varied text structures, including case inconsistencies and natural language numbers ("three hundred" successfully parsed as 300.00). By explicitly defining the `amount` key as a float and instructing the model to drop commas and currency symbols, the output was completely sanitized. Explicitly forbidding conversational filler and markdown blocks ensures the response can be immediately parsed by an application backend without triggering validation errors. While there were no outright failures, earlier iterations without the "no markdown" rule occasionally wrapped the output in backticks, which would have crashed a strict JSON parser.
+
+---
+
+## Appendix: API Replication (Python / Google Gemini SDK)
+As recommended in the assignment guidelines, here is the implementation for the Phase 3 Structured Output using the Gemini API.
+
+```python
+import google.generativeai as genai
+import os
+
+# Configure the API key using environment variables
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+prompt = """
+Extract the name, date, and amount from the following text.
+You must format your response strictly as a valid JSON object matching this exact schema:
+{ "name": "string", "date": "string", "amount": float (must be a numerical value, do not include currency symbols or commas) }
+Return ONLY the raw JSON object. Do not include markdown formatting blocks.
+Text: David Lee dropped off a check for three hundred dollars on March 10.
+"""
+
+response = model.generate_content(prompt)
+print(response.text)
